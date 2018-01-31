@@ -31,6 +31,9 @@
 
 package ru.sbt.ignite425;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.cache.configuration.FactoryBuilder;
 import javax.cache.event.CacheEntryEvent;
@@ -52,8 +55,8 @@ import org.openjdk.jmh.annotations.Warmup;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 2, time = 10)
-@Measurement(iterations = 10, time = 10)
+@Warmup(iterations = 2, time = 30)
+@Measurement(iterations = 3, time = 120)
 @Fork(1)
 public class Ignite425CQWTBenchmark extends AbstractBenchmark {
     private MyListener listener = new MyListener();
@@ -78,21 +81,20 @@ public class Ignite425CQWTBenchmark extends AbstractBenchmark {
     }
 
     @Benchmark @BenchmarkMode(Mode.Throughput)
-    public void testMethod(BenchContext ctx) {
-        if (listener.ctx == null)
-            listener.ctx = ctx;
+    public void testMethod() throws Exception {
+        listener.latch = new CountDownLatch(BATCH_SIZE*writers.size());
 
-        long val = cntr.incrementAndGet();
+        barrier.await();
 
-        testCache.put(val, val);
+        listener.latch.await();
     }
 
     public static class MyListener implements TransformedEventListener<CacheEntryEvent> {
-        public BenchContext ctx;
+        public CountDownLatch latch;
 
         @Override public void onUpdated(Iterable<? extends CacheEntryEvent> events) {
             for (CacheEntryEvent event : events) {
-                ctx.listenerExecuted++;
+                latch.countDown();
             }
         }
     }

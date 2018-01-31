@@ -31,6 +31,7 @@
 
 package ru.sbt.ignite425;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.cache.event.CacheEntryEvent;
 import javax.cache.event.CacheEntryListenerException;
@@ -51,8 +52,8 @@ import org.openjdk.jmh.annotations.Warmup;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 2, time = 10)
-@Measurement(iterations = 10, time = 10)
+@Warmup(iterations = 2, time = 30)
+@Measurement(iterations = 3, time = 120)
 @Fork(1)
 public class Ignite425CQBenchmark extends AbstractBenchmark {
     private MyListener listener =new MyListener();
@@ -75,23 +76,22 @@ public class Ignite425CQBenchmark extends AbstractBenchmark {
     }
 
     @Benchmark @BenchmarkMode(Mode.Throughput)
-    public void testMethod(BenchContext ctx) {
-        if (listener.ctx == null)
-            listener.ctx = ctx;
+    public void testMethod() throws Exception {
+        listener.latch = new CountDownLatch(BATCH_SIZE*writers.size());
 
-        long val = cntr.incrementAndGet();
+        barrier.await();
 
-        testCache.put(val, val);
+        listener.latch.await();
     }
 
     public static class MyListener implements CacheEntryUpdatedListener<Long, Long> {
-        public BenchContext ctx;
+        public CountDownLatch latch;
 
         @Override public void onUpdated(
             Iterable<CacheEntryEvent<? extends Long, ? extends Long>> iterable) throws CacheEntryListenerException {
 
             for (CacheEntryEvent<? extends Long, ? extends Long> event : iterable) {
-                ctx.listenerExecuted++;
+                latch.countDown();
             }
         }
     }

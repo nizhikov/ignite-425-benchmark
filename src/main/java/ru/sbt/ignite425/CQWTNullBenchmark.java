@@ -31,14 +31,9 @@
 
 package ru.sbt.ignite425;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.cache.configuration.FactoryBuilder;
 import javax.cache.event.CacheEntryEvent;
-import org.apache.ignite.cache.query.ContinuousQueryWithTransformer;
-import org.apache.ignite.cache.query.TransformedEventListener;
 import org.apache.ignite.lang.IgniteClosure;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -52,27 +47,24 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
+
+import static ru.sbt.ignite425.AbstractBenchmark.JVM_ARGS;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 2, time = 30)
-@Measurement(iterations = 3, time = 120)
-@Fork(1)
-public class Ignite425CQWTBenchmark extends AbstractBenchmark {
-    private MyListener listener = new MyListener();
+@Warmup(iterations = 3, time = 20)
+@Measurement(iterations = 5, time = 30)
+@Fork(value = 1, jvmArgsAppend = JVM_ARGS)
+public class CQWTNullBenchmark extends AbstractBenchmark {
+    private MyListener<Long> listener = new MyListener<>();
 
     @Setup(Level.Trial)
     @Override
     public void doSetup() {
         super.doSetup();
 
-        ContinuousQueryWithTransformer<Long, Long, CacheEntryEvent> cqwt = new ContinuousQueryWithTransformer<>();
-
-        cqwt.setRemoteTransformerFactory(FactoryBuilder.factoryOf(new MyTransformer()));
-
-        cqwt.setLocalListener(listener);
-
-        testCache.query(cqwt);
+        setupCQWT(listener, FactoryBuilder.factoryOf(new MyTransformer()));
     }
 
     @TearDown(Level.Trial)
@@ -81,27 +73,21 @@ public class Ignite425CQWTBenchmark extends AbstractBenchmark {
     }
 
     @Benchmark @BenchmarkMode(Mode.Throughput)
-    public void testMethod() throws Exception {
-        listener.latch = new CountDownLatch(BATCH_SIZE*writers.size());
+    public void putBatch(BenchContext ctx, Blackhole blackhole) throws Exception {
+        ctx.methodExecuted++;
+
+        if (listener.ctx == null) {
+            listener.ctx = ctx;
+
+            listener.blackhole = blackhole;
+        }
 
         barrier.await();
-
-        listener.latch.await();
     }
 
-    public static class MyListener implements TransformedEventListener<CacheEntryEvent> {
-        public CountDownLatch latch;
-
-        @Override public void onUpdated(Iterable<? extends CacheEntryEvent> events) {
-            for (CacheEntryEvent event : events) {
-                latch.countDown();
-            }
-        }
-    }
-
-    public static class MyTransformer implements IgniteClosure<CacheEntryEvent<? extends Long, ? extends Long>, CacheEntryEvent> {
-        @Override public CacheEntryEvent apply(CacheEntryEvent<? extends Long, ? extends Long> event) {
-            return event;
+    public static class MyTransformer implements IgniteClosure<CacheEntryEvent<? extends Long, ? extends Value>, Long> {
+        @Override public Long apply(CacheEntryEvent<? extends Long, ? extends Value> event) {
+            return null;
         }
     }
 }

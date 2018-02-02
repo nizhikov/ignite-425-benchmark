@@ -1,5 +1,7 @@
 package ru.sbt.ignite425;
 
+import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.ignite.IgniteCache;
@@ -8,17 +10,17 @@ import org.apache.ignite.IgniteCache;
  * @author NIzhikov
  */
 public class WriteThread extends Thread {
-    IgniteCache<Long, Long> testCache;
+    private IgniteCache<Long, Value> testCache;
 
-    AtomicLong cntr;
+    private AtomicLong cntr;
 
-    long iterationSize;
+    private long iterationSize;
 
-    boolean isStopped = false;
+    private boolean isStopped = false;
 
-    CyclicBarrier barrier;
+    private CyclicBarrier barrier;
 
-    public WriteThread(IgniteCache<Long, Long> testCache, AtomicLong cntr, long iterationSize, CyclicBarrier barrier) {
+    public WriteThread(IgniteCache<Long, Value> testCache, AtomicLong cntr, long iterationSize, CyclicBarrier barrier) {
         this.testCache = testCache;
         this.cntr = cntr;
         this.iterationSize = iterationSize;
@@ -33,9 +35,17 @@ public class WriteThread extends Thread {
                 return;
 
             for (int i = 0; i < iterationSize; i++) {
-                long val = cntr.incrementAndGet();
+                long id = cntr.incrementAndGet();
 
-                testCache.put(val, val);
+                Value val = new Value();
+
+                val.id = id;
+                val.str = String.valueOf(id);
+                val.str = val.str + val.str + val.str;
+                val.uuid = UUID.randomUUID();
+                val.date = new Date();
+
+                testCache.put(id, val);
             }
         }
     }

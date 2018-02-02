@@ -31,7 +31,6 @@
 
 package ru.sbt.ignite425;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.cache.event.CacheEntryEvent;
 import javax.cache.event.CacheEntryListenerException;
@@ -49,13 +48,16 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.infra.Blackhole;
+
+import static ru.sbt.ignite425.AbstractBenchmark.JVM_ARGS;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 2, time = 30)
-@Measurement(iterations = 3, time = 120)
-@Fork(1)
-public class Ignite425CQBenchmark extends AbstractBenchmark {
+@Warmup(iterations = 3, time = 20)
+@Measurement(iterations = 5, time = 30)
+@Fork(value = 1, jvmArgsAppend = JVM_ARGS)
+public class CQBenchmark extends AbstractBenchmark {
     private MyListener listener =new MyListener();
 
     @Setup(Level.Trial)
@@ -63,9 +65,11 @@ public class Ignite425CQBenchmark extends AbstractBenchmark {
     public void doSetup() {
         super.doSetup();
 
-        ContinuousQuery<Long, Long> cq = new ContinuousQuery<>();
+        ContinuousQuery<Long, Value> cq = new ContinuousQuery<>();
 
         cq.setLocalListener(listener);
+        cq.setPageSize(1024);
+        cq.setTimeInterval(150);
 
         testCache.query(cq);
     }
@@ -76,22 +80,34 @@ public class Ignite425CQBenchmark extends AbstractBenchmark {
     }
 
     @Benchmark @BenchmarkMode(Mode.Throughput)
-    public void testMethod() throws Exception {
-        listener.latch = new CountDownLatch(BATCH_SIZE*writers.size());
+    public void putBatch(BenchContext ctx, Blackhole blackhole) throws Exception {
+        ctx.methodExecuted++;
+
+        if (listener.ctx == null) {
+            listener.ctx = ctx;
+            listener.blackhole = blackhole;
+        }
 
         barrier.await();
-
-        listener.latch.await();
     }
 
-    public static class MyListener implements CacheEntryUpdatedListener<Long, Long> {
-        public CountDownLatch latch;
+    public static class MyListener implements CacheEntryUpdatedListener<Long, Value> {
+        public BenchContext ctx;
+
+         public Blackhole blackhole;
 
         @Override public void onUpdated(
-            Iterable<CacheEntryEvent<? extends Long, ? extends Long>> iterable) throws CacheEntryListenerException {
+            Iterable<CacheEntryEvent<? extends Long, ? extends Value>> iterable) throws CacheEntryListenerException {
 
-            for (CacheEntryEvent<? extends Long, ? extends Long> event : iterable) {
-                latch.countDown();
+            long cnt = 0;
+
+            for (Object event : iterable) {
+                blackhole.consume(event);
+                cnt++;
+            }
+
+            synchronized (ctx) {
+                ctx.evtCnt += cnt;
             }
         }
     }

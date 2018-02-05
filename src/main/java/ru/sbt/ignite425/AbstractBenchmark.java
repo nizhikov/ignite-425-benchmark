@@ -3,7 +3,6 @@ package ru.sbt.ignite425;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
@@ -57,14 +56,12 @@ public class AbstractBenchmark {
 
         testCache = client.createCache("testCache");
 
-        AtomicLong idGenerator = new AtomicLong();
-
         writers = new ArrayList<>();
 
         barrier = new CyclicBarrier(WRITERS_COUNT + 1);
 
         for (int i=0; i<WRITERS_COUNT; i++) {
-            WriteThread writer = new WriteThread(testCache, idGenerator, BATCH_SIZE, barrier);
+            WriteThread writer = new WriteThread(testCache, BATCH_SIZE, barrier, WRITERS_COUNT, i);
 
             writer.start();
 

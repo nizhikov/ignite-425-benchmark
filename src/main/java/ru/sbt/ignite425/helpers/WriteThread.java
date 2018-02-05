@@ -2,10 +2,7 @@ package ru.sbt.ignite425.helpers;
 
 import java.util.Date;
 import java.util.UUID;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.cache.CacheException;
 import org.apache.ignite.IgniteCache;
 
@@ -15,21 +12,26 @@ import org.apache.ignite.IgniteCache;
 public class WriteThread extends Thread {
     private IgniteCache<Long, Value> testCache;
 
-    private AtomicLong cntr;
-
-    private long iterationSize;
-
     private volatile boolean isStopped = false;
 
     private CyclicBarrier barrier;
 
     public BenchContext ctx;
 
-    public WriteThread(IgniteCache<Long, Value> testCache, AtomicLong cntr, long iterationSize, CyclicBarrier barrier) {
+    private long batchSize;
+
+    private long batchNumber;
+
+    private long writersCnt;
+
+    private long writerIdx;
+
+    public WriteThread(IgniteCache<Long, Value> testCache, long batchSize, CyclicBarrier barrier, long writersCnt, long writerIdx) {
         this.testCache = testCache;
-        this.cntr = cntr;
-        this.iterationSize = iterationSize;
+        this.batchSize = batchSize;
         this.barrier = barrier;
+        this.writersCnt = writersCnt;
+        this.writerIdx = writerIdx;
     }
 
     @Override public void run() {
@@ -43,8 +45,12 @@ public class WriteThread extends Thread {
                 return;
 
             try {
-                for (int i = 0; i < iterationSize; i++) {
-                    long id = cntr.incrementAndGet();
+                long base = writersCnt*batchNumber*batchSize + writerIdx*batchSize;
+
+                long localID = 0;
+
+                for (int i = 0; i < batchSize; i++) {
+                    long id = base + localID++;
 
                     Value val = new Value();
 
@@ -58,11 +64,13 @@ public class WriteThread extends Thread {
 
                     ctx.incPutCnt();
                 }
+
             }
             catch (CacheException e) {
                 /* no-op */
             }
 
+            batchNumber++;
         }
     }
 

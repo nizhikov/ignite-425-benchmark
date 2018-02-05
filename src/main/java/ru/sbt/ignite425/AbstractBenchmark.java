@@ -20,11 +20,11 @@ public class AbstractBenchmark {
 
     public static final int BENCH_ITERATION = 5;
 
-    public static final int BENCH_TIME = 120;
+    public static final int BENCH_TIME = 180;
 
-    public static final int BATCH_SIZE = 1024*10;
+    public static final int BATCH_SIZE = 1024*20;
 
-    public static final int WRITERS_COUNT = 6;
+    public static final int WRITERS_COUNT = 8;
 
     public static final String JVM_ARGS = "-Xmx3G";
 

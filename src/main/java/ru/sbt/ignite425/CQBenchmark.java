@@ -32,9 +32,6 @@
 package ru.sbt.ignite425;
 
 import java.util.concurrent.TimeUnit;
-import javax.cache.event.CacheEntryEvent;
-import javax.cache.event.CacheEntryListenerException;
-import javax.cache.event.CacheEntryUpdatedListener;
 import org.apache.ignite.cache.query.ContinuousQuery;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -49,66 +46,57 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
+import ru.sbt.ignite425.helpers.BenchContext;
+import ru.sbt.ignite425.cq.CQListener;
+import ru.sbt.ignite425.helpers.Value;
+import ru.sbt.ignite425.helpers.WriteThread;
 
+import static ru.sbt.ignite425.AbstractBenchmark.BENCH_ITERATION;
+import static ru.sbt.ignite425.AbstractBenchmark.BENCH_TIME;
 import static ru.sbt.ignite425.AbstractBenchmark.JVM_ARGS;
+import static ru.sbt.ignite425.AbstractBenchmark.WARMUP_ITERATION;
+import static ru.sbt.ignite425.AbstractBenchmark.WARMUP_TIME;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 20)
-@Measurement(iterations = 5, time = 30)
+@Warmup(iterations = WARMUP_ITERATION, time = WARMUP_TIME)
+@Measurement(iterations = BENCH_ITERATION, time = BENCH_TIME)
 @Fork(value = 1, jvmArgsAppend = JVM_ARGS)
 public class CQBenchmark extends AbstractBenchmark {
-    private MyListener listener =new MyListener();
-
-    @Setup(Level.Trial)
-    @Override
-    public void doSetup() {
-        super.doSetup();
-
-        ContinuousQuery<Long, Value> cq = new ContinuousQuery<>();
-
-        cq.setLocalListener(listener);
-        cq.setPageSize(1024);
-        cq.setTimeInterval(150);
-
-        testCache.query(cq);
-    }
-
-    @TearDown(Level.Trial)
-    public void doTearDown() {
-        super.doTearDown();
-    }
+    private CQListener listener;
 
     @Benchmark @BenchmarkMode(Mode.Throughput)
     public void putBatch(BenchContext ctx, Blackhole blackhole) throws Exception {
-        ctx.methodExecuted++;
-
         if (listener.ctx == null) {
             listener.ctx = ctx;
+
             listener.blackhole = blackhole;
+
+            for (WriteThread writer : writers)
+                writer.ctx = ctx;
         }
 
         barrier.await();
     }
 
-    public static class MyListener implements CacheEntryUpdatedListener<Long, Value> {
-        public BenchContext ctx;
+    @Setup(Level.Iteration)
+    @Override
+    public void doSetup() {
+        super.doSetup();
 
-         public Blackhole blackhole;
+        listener = new CQListener();
 
-        @Override public void onUpdated(
-            Iterable<CacheEntryEvent<? extends Long, ? extends Value>> iterable) throws CacheEntryListenerException {
+        ContinuousQuery<Long, Value> cq = new ContinuousQuery<>();
 
-            long cnt = 0;
+        initCommonParams(cq);
 
-            for (Object event : iterable) {
-                blackhole.consume(event);
-                cnt++;
-            }
+        cq.setLocalListener(listener);
 
-            synchronized (ctx) {
-                ctx.evtCnt += cnt;
-            }
-        }
+        testCache.query(cq);
+    }
+
+    @TearDown(Level.Iteration)
+    public void doTearDown() {
+        super.doTearDown();
     }
 }

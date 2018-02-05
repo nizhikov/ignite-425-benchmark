@@ -1,4 +1,4 @@
-package ru.sbt.ignite425;
+package ru.sbt.ignite425.helpers;
 
 import java.util.Date;
 import java.util.UUID;

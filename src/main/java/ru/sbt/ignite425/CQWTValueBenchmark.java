@@ -32,60 +32,48 @@
 package ru.sbt.ignite425;
 
 import java.util.concurrent.TimeUnit;
-import javax.cache.configuration.FactoryBuilder;
 import javax.cache.event.CacheEntryEvent;
 import org.apache.ignite.lang.IgniteClosure;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Blackhole;
+import ru.sbt.ignite425.helpers.Value;
 
+import static ru.sbt.ignite425.AbstractBenchmark.BENCH_ITERATION;
+import static ru.sbt.ignite425.AbstractBenchmark.BENCH_TIME;
 import static ru.sbt.ignite425.AbstractBenchmark.JVM_ARGS;
+import static ru.sbt.ignite425.AbstractBenchmark.WARMUP_ITERATION;
+import static ru.sbt.ignite425.AbstractBenchmark.WARMUP_TIME;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 20)
-@Measurement(iterations = 5, time = 30)
+@Warmup(iterations = WARMUP_ITERATION, time = WARMUP_TIME)
+@Measurement(iterations = BENCH_ITERATION, time = BENCH_TIME)
 @Fork(value = 1, jvmArgsAppend = JVM_ARGS)
-public class CQWTValueBenchmark extends AbstractBenchmark {
-    private MyListener<CacheEntryEvent> listener = new MyListener<>();
+public class CQWTValueBenchmark extends AbstractCQWTBenchmark<CacheEntryEvent> {
+    @Override protected IgniteClosure<CacheEntryEvent<? extends Long, ? extends Value>, CacheEntryEvent> transformer() {
+        return new EventTransformer();
+    }
 
-    @Setup(Level.Trial)
+    @Setup(Level.Iteration)
     @Override
     public void doSetup() {
         super.doSetup();
-
-        setupCQWT(listener, FactoryBuilder.factoryOf(new MyTransformer()));
     }
 
-    @TearDown(Level.Trial)
+    @TearDown(Level.Iteration)
+    @Override
     public void doTearDown() {
         super.doTearDown();
     }
 
-    @Benchmark @BenchmarkMode(Mode.Throughput)
-    public void putBatch(BenchContext ctx, Blackhole blackhole) throws Exception {
-        ctx.methodExecuted++;
-
-        if (listener.ctx == null) {
-            listener.ctx = ctx;
-
-            listener.blackhole = blackhole;
-        }
-
-        barrier.await();
-    }
-
-    public static class MyTransformer implements IgniteClosure<CacheEntryEvent<? extends Long, ? extends Value>, CacheEntryEvent> {
+    public static class EventTransformer implements IgniteClosure<CacheEntryEvent<? extends Long, ? extends Value>, CacheEntryEvent> {
         @Override public CacheEntryEvent apply(CacheEntryEvent<? extends Long, ? extends Value> event) {
             return event;
         }

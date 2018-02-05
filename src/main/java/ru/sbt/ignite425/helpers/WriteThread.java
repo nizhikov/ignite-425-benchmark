@@ -1,4 +1,4 @@
-package ru.sbt.ignite425;
+package ru.sbt.ignite425.helpers;
 
 import java.util.Date;
 import java.util.UUID;
@@ -19,6 +19,8 @@ public class WriteThread extends Thread {
     private boolean isStopped = false;
 
     private CyclicBarrier barrier;
+
+    public BenchContext ctx;
 
     public WriteThread(IgniteCache<Long, Value> testCache, AtomicLong cntr, long iterationSize, CyclicBarrier barrier) {
         this.testCache = testCache;
@@ -46,7 +48,10 @@ public class WriteThread extends Thread {
                 val.date = new Date();
 
                 testCache.put(id, val);
+
+                ctx.incPutCnt();
             }
+
         }
     }
 

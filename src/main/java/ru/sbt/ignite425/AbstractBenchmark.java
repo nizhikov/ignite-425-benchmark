@@ -4,38 +4,44 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.cache.configuration.Factory;
-import javax.cache.event.CacheEntryEvent;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
-import org.apache.ignite.cache.query.ContinuousQueryWithTransformer;
-import org.apache.ignite.cache.query.TransformedEventListener;
+import org.apache.ignite.cache.query.AbstractContinuousQuery;
 import org.apache.ignite.configuration.IgniteConfiguration;
-import org.apache.ignite.lang.IgniteClosure;
-import org.openjdk.jmh.infra.Blackhole;
+import ru.sbt.ignite425.helpers.Value;
+import ru.sbt.ignite425.helpers.WriteThread;
 
 public class AbstractBenchmark {
-    public static final String JVM_ARGS = "-Xmx3G";
+    public static final int WARMUP_ITERATION = 3;
 
-    List<Ignite> servers = new ArrayList<>();
+    public static final int WARMUP_TIME = 20;
 
-    Ignite client;
+    public static final int BENCH_ITERATION = 5;
 
-    IgniteCache<Long, Value> testCache;
+    public static final int BENCH_TIME = 30;
 
-    AtomicLong cntr = new AtomicLong();
-
-    CyclicBarrier barrier = new CyclicBarrier(WRITERS_COUNT + 1);
-
-    List<WriteThread> writers = new ArrayList<>();
-
-    public static final int BATCH_SIZE = 1024;
+    public static final int BATCH_SIZE = 1024*20;
 
     public static final int WRITERS_COUNT = 4;
 
+    public static final String JVM_ARGS = "-Xmx3G";
+
+    private List<Ignite> servers;
+
+    private Ignite client;
+
+    IgniteCache<Long, Value> testCache;
+
+    List<WriteThread> writers = new ArrayList<>();
+
+    CyclicBarrier barrier;
+
+
     public void doSetup() {
         IgniteConfiguration config = new IgniteConfiguration();
+
+        servers = new ArrayList<>();
 
         for (int i = 0; i < 3; i++) {
             config.setIgniteInstanceName("ignite" + i);
@@ -51,8 +57,14 @@ public class AbstractBenchmark {
 
         testCache = client.createCache("testCache");
 
+        AtomicLong idGenerator = new AtomicLong();
+
+        writers = new ArrayList<>();
+
+        barrier = new CyclicBarrier(WRITERS_COUNT + 1);
+
         for (int i=0; i<WRITERS_COUNT; i++) {
-            WriteThread writer = new WriteThread(testCache, cntr, BATCH_SIZE, barrier);
+            WriteThread writer = new WriteThread(testCache, idGenerator, BATCH_SIZE, barrier);
 
             writer.start();
 
@@ -77,38 +89,10 @@ public class AbstractBenchmark {
             ignite.close();
     }
 
-    <T> void setupCQWT(
-        TransformedEventListener<T> listener,
-        Factory<? extends IgniteClosure<CacheEntryEvent<? extends Long, ? extends Value>, T>> factory
-    ) {
-
-        ContinuousQueryWithTransformer<Long, Value, T> cqwt = new ContinuousQueryWithTransformer<>();
-
+    protected <K, V> void initCommonParams(AbstractContinuousQuery<K, V> cqwt) {
         cqwt.setPageSize(BATCH_SIZE);
+
         cqwt.setTimeInterval(150);
-        cqwt.setRemoteTransformerFactory(factory);
-
-        cqwt.setLocalListener(listener);
-
-        testCache.query(cqwt);
     }
 
-    public static class MyListener<T> implements TransformedEventListener<T> {
-        public BenchContext ctx;
-
-        public Blackhole blackhole;
-
-        @Override public void onUpdated(Iterable<? extends T> events) {
-            long cnt = 0;
-
-            for (T event : events) {
-                blackhole.consume(event);
-                cnt++;
-            }
-
-            synchronized (ctx) {
-                ctx.evtCnt += cnt;
-            }
-        }
-    }
 }

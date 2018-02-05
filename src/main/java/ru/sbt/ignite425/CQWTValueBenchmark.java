@@ -62,14 +62,12 @@ public class CQWTValueBenchmark extends AbstractCQWTBenchmark<CacheEntryEvent> {
     }
 
     @Setup(Level.Iteration)
-    @Override
-    public void doSetup() {
+    public void setup() {
         super.doSetup();
     }
 
     @TearDown(Level.Iteration)
-    @Override
-    public void doTearDown() {
+    public void tearDown() {
         super.doTearDown();
     }
 

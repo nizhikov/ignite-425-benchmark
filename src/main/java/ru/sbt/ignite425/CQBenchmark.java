@@ -80,8 +80,7 @@ public class CQBenchmark extends AbstractBenchmark {
     }
 
     @Setup(Level.Iteration)
-    @Override
-    public void doSetup() {
+    public void setup() {
         super.doSetup();
 
         listener = new CQListener();
@@ -96,7 +95,7 @@ public class CQBenchmark extends AbstractBenchmark {
     }
 
     @TearDown(Level.Iteration)
-    public void doTearDown() {
+    public void tearDown() {
         super.doTearDown();
     }
 }

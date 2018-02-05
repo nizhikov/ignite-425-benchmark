@@ -9,21 +9,22 @@ import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.query.AbstractContinuousQuery;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.internal.util.typedef.G;
 import ru.sbt.ignite425.helpers.Value;
 import ru.sbt.ignite425.helpers.WriteThread;
 
 public class AbstractBenchmark {
-    public static final int WARMUP_ITERATION = 3;
+    public static final int WARMUP_ITERATION = 5;
 
-    public static final int WARMUP_TIME = 20;
+    public static final int WARMUP_TIME = 30;
 
     public static final int BENCH_ITERATION = 5;
 
-    public static final int BENCH_TIME = 30;
+    public static final int BENCH_TIME = 120;
 
-    public static final int BATCH_SIZE = 1024*20;
+    public static final int BATCH_SIZE = 1024*10;
 
-    public static final int WRITERS_COUNT = 4;
+    public static final int WRITERS_COUNT = 6;
 
     public static final String JVM_ARGS = "-Xmx3G";
 
@@ -33,10 +34,9 @@ public class AbstractBenchmark {
 
     IgniteCache<Long, Value> testCache;
 
-    List<WriteThread> writers = new ArrayList<>();
+    List<WriteThread> writers;
 
     CyclicBarrier barrier;
-
 
     public void doSetup() {
         IgniteConfiguration config = new IgniteConfiguration();
@@ -76,17 +76,12 @@ public class AbstractBenchmark {
         for (WriteThread writer : writers)
             writer.setStopped();
 
-        try {
-            barrier.await();
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        barrier.reset();
 
-        client.close();
+        G.stop(client.name(), true);
 
         for (Ignite ignite : servers)
-            ignite.close();
+            G.stop(ignite.name(), true);
     }
 
     protected <K, V> void initCommonParams(AbstractContinuousQuery<K, V> cqwt) {

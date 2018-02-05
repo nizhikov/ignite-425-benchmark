@@ -2,8 +2,11 @@ package ru.sbt.ignite425.helpers;
 
 import java.util.Date;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.cache.CacheException;
 import org.apache.ignite.IgniteCache;
 
 /**
@@ -16,7 +19,7 @@ public class WriteThread extends Thread {
 
     private long iterationSize;
 
-    private boolean isStopped = false;
+    private volatile boolean isStopped = false;
 
     private CyclicBarrier barrier;
 
@@ -31,25 +34,33 @@ public class WriteThread extends Thread {
 
     @Override public void run() {
         while (true) {
+            if (isStopped)
+                return;
+
             waitBarrier();
 
             if (isStopped)
                 return;
 
-            for (int i = 0; i < iterationSize; i++) {
-                long id = cntr.incrementAndGet();
+            try {
+                for (int i = 0; i < iterationSize; i++) {
+                    long id = cntr.incrementAndGet();
 
-                Value val = new Value();
+                    Value val = new Value();
 
-                val.id = id;
-                val.str = String.valueOf(id);
-                val.str = val.str + val.str + val.str;
-                val.uuid = UUID.randomUUID();
-                val.date = new Date();
+                    val.id = id;
+                    val.str = String.valueOf(id);
+                    val.str = val.str + val.str + val.str;
+                    val.uuid = UUID.randomUUID();
+                    val.date = new Date();
 
-                testCache.put(id, val);
+                    testCache.put(id, val);
 
-                ctx.incPutCnt();
+                    ctx.incPutCnt();
+                }
+            }
+            catch (CacheException e) {
+                /* no-op */
             }
 
         }
@@ -60,7 +71,7 @@ public class WriteThread extends Thread {
             barrier.await();
         }
         catch (Exception e) {
-            throw new RuntimeException(e);
+            /* no-op */
         }
     }
 

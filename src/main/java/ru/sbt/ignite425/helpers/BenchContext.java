@@ -1,6 +1,6 @@
 package ru.sbt.ignite425.helpers;
 
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
@@ -13,29 +13,29 @@ import org.openjdk.jmh.annotations.State;
 @State(Scope.Thread)
 @AuxCounters(AuxCounters.Type.EVENTS)
 public class BenchContext {
-    private AtomicLong evtCnt = new AtomicLong();
+    private LongAdder evtCnt = new LongAdder();
 
-    private AtomicLong putCnt = new AtomicLong();
+    private LongAdder putCnt = new LongAdder();
 
     @Setup(Level.Iteration)
     public void clean() {
-        evtCnt.set(0);
-        putCnt.set(0);
+        evtCnt.reset();
+        putCnt.reset();
     }
 
     public void incEvtCnt() {
-        this.evtCnt.incrementAndGet();
+        this.evtCnt.add(1);
     }
 
     public void incPutCnt() {
-        this.putCnt.incrementAndGet();
+        this.putCnt.add(1);
     }
 
     public long listenerReceiveEvt() {
-        return evtCnt.get();
+        return evtCnt.longValue();
     }
 
     public long putCnt() {
-        return putCnt.get();
+        return putCnt.longValue();
     }
 }

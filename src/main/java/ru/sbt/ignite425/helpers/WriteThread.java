@@ -45,12 +45,10 @@ public class WriteThread extends Thread {
                 return;
 
             try {
-                long base = writersCnt*batchNumber*batchSize + writerIdx*batchSize;
-
-                long localID = 0;
+                long localID = writersCnt*batchNumber*batchSize + writerIdx*batchSize;
 
                 for (int i = 0; i < batchSize; i++) {
-                    long id = base + localID++;
+                    long id = localID++;
 
                     Value val = new Value();
 
